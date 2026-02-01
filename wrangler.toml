@@ -1,0 +1,16 @@
+name = "1995"
+main = "worker.js"
+compatibility_date = "2025-02-01"
+
+# Define routes that should trigger this worker
+# routes = [
+#   { pattern = "sitedesigns.online/*", zone_name = "sitedesigns.online" },
+# ]
+
+# Observability settings
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true
