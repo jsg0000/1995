@@ -1,42 +1,63 @@
 export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
+  async fetch(request, env, ctx) {
+    try {
+      const url = new URL(request.url);
 
-    // Serve the main HTML page
-    if (url.pathname === '/' || url.pathname === '/index.html') {
-      // Get and increment visit counter
-      let count = await env.VISITOR_COUNT.get('count');
-      count = count ? parseInt(count) + 1 : 1;
-      await env.VISITOR_COUNT.put('count', count.toString());
+      // Serve the counter image
+      if (url.pathname === '/counter.gif') {
+        let count = '000000';
+        try {
+          const storedCount = await env.VISITOR_COUNT.get('count');
+          count = storedCount ? storedCount.padStart(6, '0') : '000001';
+        } catch (e) {
+          console.error('KV read error:', e);
+        }
+        
+        const svg = generateCounterSVG(count);
+        
+        return new Response(svg, {
+          headers: {
+            'Content-Type': 'image/svg+xml',
+            'Cache-Control': 'no-cache',
+          },
+        });
+      }
 
-      const html = getHTML(count);
-      
-      return new Response(html, {
-        headers: {
-          'Content-Type': 'text/html;charset=UTF-8',
-        },
-      });
+      // Serve the main HTML page
+      if (url.pathname === '/' || url.pathname === '/index.html') {
+        let count = 1;
+        
+        try {
+          // Get current count
+          const storedCount = await env.VISITOR_COUNT.get('count');
+          count = storedCount ? parseInt(storedCount) + 1 : 1;
+          
+          // Increment counter (non-blocking using waitUntil)
+          ctx.waitUntil(env.VISITOR_COUNT.put('count', count.toString()));
+        } catch (e) {
+          console.error('KV operation error:', e);
+          // Continue with default count if KV fails
+        }
+
+        const html = getHTML(count);
+        
+        return new Response(html, {
+          headers: {
+            'Content-Type': 'text/html;charset=UTF-8',
+          },
+        });
+      }
+
+      return new Response('Not Found', { status: 404 });
+    } catch (error) {
+      console.error('Worker error:', error);
+      return new Response('Internal Server Error', { status: 500 });
     }
-
-    // Serve the counter image
-    if (url.pathname === '/counter.gif') {
-      const count = await env.VISITOR_COUNT.get('count') || '0';
-      const svg = generateCounterSVG(count);
-      
-      return new Response(svg, {
-        headers: {
-          'Content-Type': 'image/svg+xml',
-          'Cache-Control': 'no-cache',
-        },
-      });
-    }
-
-    return new Response('Not Found', { status: 404 });
   },
 };
 
 function generateCounterSVG(count) {
-  const digits = count.padStart(6, '0').split('');
+  const digits = count.toString().padStart(6, '0').split('');
   const width = digits.length * 15;
   
   let digitBoxes = '';
